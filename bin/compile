@@ -100,6 +100,7 @@ meta_set "build-step" "init"
 [ -e "$BUILD_DIR/node_modules" ] && PREBUILD=true || PREBUILD=false
 [ -f "$BUILD_DIR/yarn.lock" ] && YARN=true || YARN=false
 [ -f "$BUILD_DIR/package-lock.json" ] && NPM_LOCK=true || NPM_LOCK=false
+[ -f "$BUILD_DIR/pnpm-lock.yaml" ] && PNPM=true || PNPM=false
 YARN_2=$(detect_yarn_2 "$YARN" "$BUILD_DIR")
 
 ### Save build info
@@ -228,6 +229,15 @@ install_bins() {
   mcount "version.node.$node_version"
   meta_set "node-version" "$node_version"
 
+  if $PNPM; then
+    meta_set "build-step" "install-pnpm"
+    echo "Downloading and installing pnpm..."
+    corepack enable
+    corepack prepare pnpm@$PNPM_VERSION --activate
+    pnpm config set store-dir "$CACHE_DIR"/.pnpm-store
+    echo "pnpm $(pnpm --version) installed"
+  fi
+
   # Download yarn if there is a yarn.lock file or if the user
   # has specified a version of yarn under "engines". We'll still
   # only install using yarn if there is a yarn.lock file
@@ -323,6 +333,8 @@ build_dependencies() {
     yarn_2_install "$BUILD_DIR"
   elif $YARN; then
     yarn_node_modules "$BUILD_DIR"
+  elif $PNPM; then
+    pnpm_node_modules "$BUILD_DIR"
   elif $PREBUILD; then
     echo "Prebuild detected (node_modules already exists)"
     npm_rebuild "$BUILD_DIR"
@@ -367,6 +379,8 @@ cache_build() {
 prune_devdependencies() {
   if $YARN || $YARN_2; then
     yarn_prune_devdependencies "$BUILD_DIR" "$YARN_CACHE_FOLDER" "$BP_DIR"
+  elif $PNPM; then
+    pnpm_prune_devdependencies "$BUILD_DIR"
   else
     npm_prune_devdependencies "$BUILD_DIR"
   fi
@@ -384,6 +398,12 @@ elif "$YARN" && "$USE_YARN_CACHE" && [[ "$(get_cache_directories "$BUILD_DIR")" 
   prune_devdependencies | output "$LOG_FILE"
   meta_set "build-step" "save-cache"
   cache_build | output "$LOG_FILE"
+elif $PNPM; then
+  meta_set "build-step" "save-cache"
+  cache_build | output "$LOG_FILE"
+  meta_set "build-step" "prune-dependencies"
+  header "Pruning devDependencies" | output "$LOG_FILE"
+  prune_devdependencies | output "$LOG_FILE"
 else
   meta_set "build-step" "save-cache"
   cache_build | output "$LOG_FILE"

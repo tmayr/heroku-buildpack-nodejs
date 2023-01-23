@@ -307,3 +307,28 @@ npm_prune_devdependencies() {
     meta_set "skipped-prune" "false"
   fi
 }
+
+pnpm_prune_devdependencies() {
+  local pnpm_version
+  local build_dir=${1:-}
+
+  pnpm_version=$(pnpm --version)
+
+  if [ "$NODE_ENV" == "test" ]; then
+    echo "Skipping because NODE_ENV is 'test'"
+    meta_set "skipped-prune" "true"
+    return 0
+  elif [ "$NODE_ENV" != "production" ]; then
+    echo "Skipping because NODE_ENV is not 'production'"
+    meta_set "skipped-prune" "true"
+    return 0
+  elif [ -n "$NPM_CONFIG_PRODUCTION" ]; then
+    echo "Skipping because NPM_CONFIG_PRODUCTION is '$NPM_CONFIG_PRODUCTION'"
+    meta_set "skipped-prune" "true"
+    return 0
+  else
+    cd "$build_dir" || return
+    monitor "pnpm-prune" pnpm prune --prod 2>&1
+    meta_set "skipped-prune" "false"
+  fi
+}
