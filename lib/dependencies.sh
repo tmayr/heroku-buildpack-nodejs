@@ -308,6 +308,15 @@ npm_prune_devdependencies() {
   fi
 }
 
+pnpm_node_modules() {
+  local build_dir=${1:-}
+  local production=${PNPM_PRODUCTION:-false}
+
+  echo "Installing node modules (pnpm-lock.yaml)"
+  cd "$build_dir" || return
+  monitor "pnpm-install" env NODE_ENV=build pnpm install 2>&1
+}
+
 pnpm_prune_devdependencies() {
   local pnpm_version
   local build_dir=${1:-}
